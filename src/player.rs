@@ -1,24 +1,27 @@
 use bevy::prelude::*;
+use bevy_rapier2d::na::Rotation2;
 use bevy_rapier2d::prelude::*;
 use std::f32::consts::TAU;
 
 use crate::METERS_TO_PIXELS;
 
-pub const PLAYER_HEIGHT: f32 = 1.;
+// Constants for physics (Units are meters and seconds)
+pub const PLAYER_HEIGHT: f32 = 1.5;
 pub const PLAYER_WIDTH: f32 = 1.;
-pub const VELOCITY: f32 = 30.; // v_x
+pub const VELOCITY: f32 = 20.; // v_x
 pub const MAX_VELOCITY: f32 = 3. * VELOCITY;
-pub const JUMP_DISTANCE: f32 = 20. * PLAYER_WIDTH; // 2 * x_h
-pub const JUMP_HEIGHT: f32 = 4. * PLAYER_HEIGHT; // h
+pub const JUMP_DISTANCE: f32 = 7.; // 2 * x_h
+pub const JUMP_HEIGHT: f32 = 5.; // h
 
+// Derived constants for physics
 pub const VELOCITY_SQUARED: f32 = VELOCITY * VELOCITY;
 pub const JUMP_DISTANCE_HALF: f32 = JUMP_DISTANCE / 2.; // x_h
 pub const JUMP_DISTANCE_HALF_SQUARED: f32 =
     JUMP_DISTANCE_HALF * JUMP_DISTANCE_HALF;
 pub const JUMP_GRAVITY: f32 =
     (-2. * JUMP_HEIGHT * VELOCITY_SQUARED) / JUMP_DISTANCE_HALF_SQUARED;
-pub const GRAVITY: f32 = 5. * JUMP_GRAVITY;
-pub const PLAYER_JUMP_VELOCITY: f32 =
+pub const GRAVITY: f32 = 3. * JUMP_GRAVITY;
+pub const JUMP_VELOCITY: f32 =
     (2. * JUMP_HEIGHT * VELOCITY) / JUMP_DISTANCE_HALF;
 
 pub const BOUNDARY: f32 = 100.;
@@ -26,27 +29,27 @@ pub const BOUNDARY: f32 = 100.;
 pub struct Player;
 
 pub struct Physics {
-    pub down: Vector<f32>,
-    pub left: Vector<f32>,
-    pub right: Vector<f32>,
-    pub gravity: f32,
+    // Basis has the columns [right, up]
+    pub basis: Matrix<f32>,
+    pub gravity_scalar: f32,
 }
 
 impl Physics {
-    pub fn rotate(mut self: &mut Self, radians: f32) {
-        let iso = Isometry::rotation(radians);
-        self.down = iso * self.down;
-        self.left = iso * self.left;
-        self.right = iso * self.right;
-    }
-
     pub fn new() -> Self {
         return Physics {
-            down: [0., 1.].into(),
-            left: [-1., 0.].into(),
-            right: [1., 0.].into(),
-            gravity: GRAVITY,
+            basis: Matrix::new(1., 0., 0., 1.),
+            gravity_scalar: GRAVITY,
         };
+    }
+
+    pub fn rotate(mut self: &mut Self, radians: f32) {
+        let rotation = Rotation2::new(radians);
+        self.basis = self.basis * rotation;
+    }
+
+    pub fn get_gravity(&self) -> Vector<f32> {
+        let scale: Vector<f32> = [0., self.gravity_scalar].into();
+        self.basis * scale
     }
 }
 
@@ -62,7 +65,7 @@ pub fn spawn_player(
         },
         forces: RigidBodyForces {
             gravity_scale: 0.,
-            force: physics.gravity * physics.down,
+            force: physics.get_gravity(),
             ..Default::default()
         },
         mass_properties: RigidBodyMassPropsFlags::ROTATION_LOCKED.into(),
@@ -71,9 +74,9 @@ pub fn spawn_player(
     let collider = ColliderBundle {
         shape: ColliderShape::cuboid(PLAYER_WIDTH / 2., PLAYER_HEIGHT / 2.),
         material: ColliderMaterial {
-            friction: 0.1,
+            friction: 0.3,
             friction_combine_rule: CoefficientCombineRule::Min.into(),
-            restitution: 0.1,
+            restitution: 0.3,
             restitution_combine_rule: CoefficientCombineRule::Min.into(),
             ..Default::default()
         },
@@ -100,7 +103,7 @@ pub fn link_physics(
     mut query: Query<(&mut RigidBodyForces, &mut Physics), With<Player>>,
 ) {
     for (mut forces, physics) in query.iter_mut() {
-        forces.force = physics.gravity * physics.down;
+        forces.force = physics.get_gravity();
     }
 }
 
@@ -118,12 +121,17 @@ pub fn player_jump(
 ) {
     for (mut physics, mut velocity) in query.iter_mut() {
         if kb.just_pressed(KeyCode::Space) {
-            physics.gravity = JUMP_GRAVITY;
-            velocity.linvel += PLAYER_JUMP_VELOCITY * physics.down;
+            let decomposition = physics.basis.lu();
+            let x = decomposition.solve(&velocity.linvel).expect("Ooops!");
+            if x.y < JUMP_VELOCITY {
+                let movement: Vector<f32> = [x.x, JUMP_VELOCITY].into();
+                physics.gravity_scalar = JUMP_GRAVITY;
+                velocity.linvel = physics.basis * movement;
+            }
         }
 
         if kb.just_released(KeyCode::Space) {
-            physics.gravity = GRAVITY;
+            physics.gravity_scalar = GRAVITY;
         }
     }
 }
@@ -133,17 +141,20 @@ pub fn player_move(
     mut query: Query<(&Physics, &mut RigidBodyVelocity), With<Player>>,
 ) {
     for (physics, mut velocity) in query.iter_mut() {
-        if kb.just_pressed(KeyCode::A) {
-            velocity.linvel += physics.left * VELOCITY;
+        let decomposition = physics.basis.lu();
+        let x = decomposition.solve(&velocity.linvel).expect("Ooops!");
+        if kb.pressed(KeyCode::A) {
+            if x.x > -1. * MAX_VELOCITY {
+                let movement: Vector<f32> = [-1. * VELOCITY, x.y].into();
+                velocity.linvel = physics.basis * movement;
+            }
         }
-        if kb.just_released(KeyCode::A) {
-            velocity.linvel -= physics.left * VELOCITY;
-        }
-        if kb.just_pressed(KeyCode::D) {
-            velocity.linvel += physics.right * VELOCITY;
-        }
-        if kb.just_released(KeyCode::D) {
-            velocity.linvel -= physics.right * VELOCITY;
+
+        if kb.pressed(KeyCode::D) {
+            if x.x < MAX_VELOCITY {
+                let movement: Vector<f32> = [VELOCITY, x.y].into();
+                velocity.linvel = physics.basis * movement;
+            }
         }
     }
 }
