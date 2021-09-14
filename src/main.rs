@@ -4,7 +4,7 @@ use bevy_rapier2d::prelude::*;
 mod map;
 mod player;
 
-pub const METERS_TO_PIXELS: f32 = 10.; // 10px is 1m
+pub const METERS_TO_PIXELS: f32 = 12.; // 10px is 1m
 
 pub const WINDOW_WIDTH: f32 = 80.;
 pub const WINDOW_HEIGHT: f32 = 60.;
@@ -21,7 +21,7 @@ fn main() {
         })
         .insert_resource(RapierConfiguration {
             scale: METERS_TO_PIXELS,
-            gravity: [0., 1.].into(),
+            gravity: [0., 0.].into(),
             ..Default::default()
         })
         .insert_resource(ClearColor(Color::rgb(0., 0., 0.)))
@@ -31,6 +31,10 @@ fn main() {
         .add_system(bevy::input::system::exit_on_esc_system.system())
         .add_system(player::player_jump.system())
         .add_system(player::player_move.system())
+        .add_system(player::respawn.system())
+        .add_system(player::rotate.system())
+        .add_system(player::link_physics.system())
+        .add_system(player::limit_velocity.system())
         .run();
 }
 

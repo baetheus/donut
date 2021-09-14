@@ -13,21 +13,36 @@ pub fn spawn_ground(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     /* Create the ground. */
-    let collider = ColliderBundle {
-        shape: ColliderShape::cuboid(GROUND_WIDTH / 2., GROUND_HEIGHT / 2.),
-        position: [0., GROUND + GROUND_HEIGHT].into(),
-        ..Default::default()
-    };
-    let sprite = SpriteBundle {
-        material: materials.add(Color::rgb(0.2, 0.2, 0.5).into()),
-        sprite: Sprite::new(Vec2::new(
-            GROUND_WIDTH * METERS_TO_PIXELS,
-            GROUND_HEIGHT * METERS_TO_PIXELS,
-        )),
-        ..Default::default()
-    };
     commands
-        .spawn_bundle(collider)
-        .insert_bundle(sprite)
+        .spawn_bundle(ColliderBundle {
+            shape: ColliderShape::cuboid(GROUND_WIDTH / 2., GROUND_HEIGHT / 2.),
+            position: [0., GROUND + GROUND_HEIGHT].into(),
+            ..Default::default()
+        })
+        .insert_bundle(SpriteBundle {
+            material: materials.add(Color::rgb(0.2, 0.2, 0.5).into()),
+            sprite: Sprite::new(Vec2::new(
+                GROUND_WIDTH * METERS_TO_PIXELS,
+                GROUND_HEIGHT * METERS_TO_PIXELS,
+            )),
+            ..Default::default()
+        })
+        .insert(ColliderPositionSync::Discrete);
+
+    /* Create the ceiling. */
+    commands
+        .spawn_bundle(ColliderBundle {
+            shape: ColliderShape::cuboid(GROUND_WIDTH / 2., GROUND_HEIGHT / 2.),
+            position: [0., -1. * (GROUND + GROUND_HEIGHT)].into(),
+            ..Default::default()
+        })
+        .insert_bundle(SpriteBundle {
+            material: materials.add(Color::rgb(0.2, 0.2, 0.5).into()),
+            sprite: Sprite::new(Vec2::new(
+                GROUND_WIDTH * METERS_TO_PIXELS,
+                GROUND_HEIGHT * METERS_TO_PIXELS,
+            )),
+            ..Default::default()
+        })
         .insert(ColliderPositionSync::Discrete);
 }
