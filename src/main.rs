@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 
+mod ldtk;
 mod map;
 mod player;
 
@@ -13,6 +14,7 @@ fn main() {
     App::build()
         .add_plugins(DefaultPlugins)
         .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
+        // .add_plugin(ldtk::MapPlugin)
         .insert_resource(WindowDescriptor {
             title: "Donut".to_string(),
             width: WINDOW_WIDTH * METERS_TO_PIXELS,
@@ -34,11 +36,21 @@ fn main() {
         .add_system(player::respawn.system())
         .add_system(player::rotate.system())
         .add_system(player::link_physics.system())
-        .add_system(player::limit_velocity.system())
+//        .add_system(player::limit_velocity.system())
+        .add_system(player::follow_player.system())
         .run();
 }
 
+pub struct MainCamera;
+
 fn setup(mut commands: Commands) {
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands
+        .spawn_bundle(OrthographicCameraBundle::new_2d())
+        .insert(MainCamera);
     commands.spawn_bundle(UiCameraBundle::default());
+}
+
+fn return_something() -> isize {
+    let my_variable: isize = 15;
+    my_variable
 }
